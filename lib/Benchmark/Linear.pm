@@ -3,7 +3,7 @@ package Benchmark::Linear;
 use 5.006;
 use strict;
 use warnings;
-our $VERSION = 0.01;
+our $VERSION = 0.0101;
 
 =head1 NAME
 
@@ -44,6 +44,8 @@ sub new {
     ref $opt{code} eq 'CODE'
         or croak "$class->new(): 'code' is required and must be a function";
     $opt{max_time} ||= 0.2;
+    $opt{min_arg}  ||= 1;
+    $opt{max_arg}  ||= 2**45;
 
     return bless \%opt, $class;
 };
@@ -64,20 +66,18 @@ sub do_run {
 
     my %ret;
 
-    my $min = 10;
-    # TODO find lower boundary
-
-    my $n = $min;
+    my $n = $self->{min_arg};
     my $t = 0; # cumulative run time
-    # increase until exec_time >= max_exec or x1024
-    foreach my $max_steps (1 .. 100) {
+
+    # generate enough data first
+    foreach my $lead (1 .. 10) {
         $t += $ret{$n} = $self->run_step($n);
-        $t > $self->{max_time} and last;
-        $n = int(3 * $n / 2 + 1);
+        $n++;
     };
-    # get at least $min data points
-    for ( $n = scalar keys %ret; $n < $min; $n++) {
-        $ret{$n} = $self->run_step($n);
+    # increase until exec_time >= max_exec or x1024
+    while( $n < $self->{max_arg} and $t < $self->{max_time}) {
+        $t += $ret{$n} = $self->run_step($n);
+        $n = int(3 * $n / 2 + 1);
     };
 
     return \%ret;
