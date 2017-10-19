@@ -3,7 +3,7 @@ package Benchmark::Linear;
 use 5.006;
 use strict;
 use warnings;
-our $VERSION = 0.0101;
+our $VERSION = 0.0103;
 
 =head1 NAME
 
@@ -42,88 +42,113 @@ sub new {
     my ($class, %opt) = @_;
 
     ref $opt{code} eq 'CODE'
-        or croak "$class->new(): 'code' is required and must be a function";
-    $opt{max_time} ||= 0.2;
+        or $class->_croak( "'code' is required and must be a function" );
     $opt{min_arg}  ||= 1;
-    $opt{max_arg}  ||= 2**45;
+    $opt{max_arg}  ||= 1_000_000;
+    $opt{repeat}   ||= 5;
+    $opt{init}     ||= sub {};
+    $opt{cleanup}  ||= sub {};
 
     return bless \%opt, $class;
 };
 
 sub run {
-    my ($self, $fun) = @_;
-
-    $self->_croak( "Unknown analysis type $fun" )
-        unless !$fun or $self->can($fun);
-
-    $self->{data} ||= $self->do_run;
-
-    return $fun ? $self->$fun( $self->{data} ) : $self->{data}; 
-};
-
-sub do_run {
     my ($self, %opt) = @_;
 
-    my %ret;
+    # TODO infer count from min, max
+    $opt{count} ||= $self->default_count;
+    $self->_croak( "count=[...] is required" )
+        unless ref $opt{count} eq 'ARRAY';
+
+    # TODO run auto!
+    my $elapsed = 0;
+    foreach my $n ( @{ $opt{count} } ) {
+        my @stat = $self->run_point( $n, $opt{repeat} );
+        $self->{stat}{$n} = \@stat;
+        $elapsed += $stat[0] * $stat[2];
+        last if $opt{max_time} and $elapsed > $opt{max_time};
+    };
+    $self->{elapsed} += $elapsed;
+
+    return $self;
+};
+
+sub run_point {
+    my ($self, $n, $repeat) = @_;
+
+    $repeat ||= $self->{repeat};
+
+    # run the code
+    my ($s, $s2);
+    my $code = $self->{code};
+    for my $i ( 1 .. $repeat ) {
+        local $_ = $n;
+        my $env = $self->{init}->($n);
+        my $t0 = time;
+        $code->($n, $env);
+        my $t = time - $t0;
+        $s  += $t;
+        $s2 += $t*$t;
+        $self->{cleanup}->($n, $env);
+    };
+
+    # preprocess stats
+    my $average = $s / $repeat;
+    my $sigma   = $s2/$repeat - $average*$average;
+    $sigma = $sigma <= 0 ? 0 : sqrt($sigma);
+
+    # TODO or just [] and let user choose?
+    return wantarray ? ($average, $sigma, $repeat) : $average;
+};
+
+sub stat {
+    my $self = shift;
+    return $self->{stat} || {};
+};
+
+sub default_count {
+    my $self = shift;
 
     my $n = $self->{min_arg};
-    my $t = 0; # cumulative run time
-
-    # generate enough data first
-    foreach my $lead (1 .. 10) {
-        $t += $ret{$n} = $self->run_step($n);
-        $n++;
-    };
-    # increase until exec_time >= max_exec or x1024
-    while( $n < $self->{max_arg} and $t < $self->{max_time}) {
-        $t += $ret{$n} = $self->run_step($n);
-        $n = int(3 * $n / 2 + 1);
+    my @ret;
+    while ($n <= $self->{max_arg}) {
+        push @ret, $n;
+        $n = int (($n * 3 + 1)/2);
     };
 
-    return \%ret;
+    return \@ret;
 };
 
-sub run_step {
-    my ($self, $n) = @_;
+sub linear_approx {
+    my ($self, $pairs) = @_;
 
-    my $s = 0;
-    my $code = $self->{code};
-    for my $i (1..5) {
-        my $t0 = time;
-        $code->($n);
-        $s += time - $t0;
+    my( $n, $x, $y, $x2, $xy);
+    foreach (@$pairs) {
+        my $wt = $_->[2] || 1;
+
+        $x  += $wt * $_->[0];
+        $y  += $wt * $_->[1];
+        $x2 += $wt * $_->[0]*$_->[0];
+        $xy += $wt * $_->[0]*$_->[1];
+        $n  += $wt;
     };
-    return $s/5; # TODO remove hardcode, return 0 if too shaky data
+
+    # y =~ A*x + B; 
+    my $A = ($xy - $x*$y/$n) / ($x2 - $x*$x/$n);
+    my $B = ($y - $A*$x) / $n;
+
+    return ($A, $B);
 };
 
-sub infer_linear {
+sub time_per_op {
     my $self = shift;
-    my $data = shift || $self->{data};
+    my $data = shift || $self->{stat};
 
-    my @steps = sort { $a <=> $b } keys %$data;
-    my @times = @$data{@steps};
+    # TODO Add weight based on dispersion
+    my @work = map { [ $_ => $data->{$_}[0] ] } keys %$data;
 
-    my @points;
-    for (my $i = @steps-1; $i-->0; ) {
-        push @points, ( ($times[$i+1] - $times[$i]) 
-                      / ($steps[$i+1] - $steps[$i]) ); 
-    };
-
-    return _average( \@points );
-};
-
-sub _average {
-    my ($data) = @_;
-
-    my ($sum, $sum2) = (0,0);
-
-    $sum    += $_ for @$data;
-    $sum2   += $_*$_ for @$data;
-
-    my $avg  = $sum / @$data;
-    my $disp = sqrt( ($sum2 - $sum * $sum / @$data) / (@$data - 1) );
-
-    return ( $avg, $disp );
+    my ($A, $B) = $self->linear_approx( \@work );
+    return $A;
 };
 
 sub _croak {
@@ -133,7 +158,7 @@ sub _croak {
     my $fun = $stack[3];
     $fun =~ s/^.*:://;
 
-    croak (ref $self || $self)."->$fun(): $msg";
+    Carp::croak( (ref $self || $self)."->$fun(): $msg" );
 };
 
 =head1 AUTHOR
