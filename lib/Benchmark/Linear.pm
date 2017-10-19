@@ -3,7 +3,7 @@ package Benchmark::Linear;
 use 5.006;
 use strict;
 use warnings;
-our $VERSION = 0.0103;
+our $VERSION = 0.0104;
 
 =head1 NAME
 
@@ -33,6 +33,31 @@ It is assumed that execution time grows with (n).
 
 use Time::HiRes qw(time);
 use Carp;
+use Exporter qw(import);
+our @EXPORT_OK = qw(bench);
+
+=head2 bench { CODE; } [ option => ... ];
+
+Run a benchmark and return a L<Benchmark::Linear> object
+with statistics populated.
+
+=cut
+
+sub bench(&@) {
+    my ($code, %opt) = @_;
+
+    $opt{code} = $code;
+    $opt{max_time} ||= 1;
+
+    croak( "Useless use of bench{ ... } in void context" )
+        unless defined wantarray;
+
+    # TODO filter options
+    my $bl = __PACKAGE__->new( %opt );
+    $bl->run( %opt );
+
+    return $bl;
+};
 
 =head2 new
 
