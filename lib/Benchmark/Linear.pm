@@ -1,6 +1,6 @@
 package Benchmark::Linear;
 
-use 5.006;
+use 5.010;
 use strict;
 use warnings;
 our $VERSION = 0.0104;
@@ -66,8 +66,6 @@ sub bench(&@) {
 sub new {
     my ($class, %opt) = @_;
 
-    ref $opt{code} eq 'CODE'
-        or $class->_croak( "'code' is required and must be a function" );
     $opt{min_arg}  ||= 1;
     $opt{max_arg}  ||= 1_000_000;
     $opt{repeat}   ||= 5;
@@ -77,6 +75,14 @@ sub new {
     return bless \%opt, $class;
 };
 
+my @cloneable = qw( min_arg max_arg repeat init cleanup code );
+sub clone {
+    my ($self, %opt) = @_;
+
+    $opt{$_} //= $self->{$_} for @cloneable;
+    return (ref $self)->new( %opt );
+};
+
 sub run {
     my ($self, %opt) = @_;
 
@@ -84,6 +90,13 @@ sub run {
     $opt{count} ||= $self->default_count;
     $self->_croak( "count=[...] is required" )
         unless ref $opt{count} eq 'ARRAY';
+
+    # If external code supplied, make a clean obj for new stat
+    $self = $self->clone( code => $opt{code} )
+        if ($opt{code});
+
+    $self->_croak("code is required in either new() or run()")
+        unless $self->{code};
 
     # TODO run auto!
     my $elapsed = 0;
