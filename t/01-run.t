@@ -22,7 +22,7 @@ is (scalar @wrong_repeat, 0, "Each step executed exactly 5 times")
 
 is( scalar keys %trace, 10, "Exactly 10 pts" );
 
-is_deeply( [sort keys %trace], [sort keys %{ $bl->stat } ]
+is_deeply( [sort keys %trace], [sort keys %{ $bl->get_stat } ]
     , "Stat keys == trace keys" );
 
 done_testing;

@@ -36,6 +36,8 @@ use Carp;
 use Exporter qw(import);
 our @EXPORT_OK = qw(bench);
 
+use Benchmark::Linear::Approx;
+
 =head2 bench { CODE; } [ option => ... ];
 
 Run a benchmark and return a L<Benchmark::Linear> object
@@ -139,26 +141,24 @@ sub run_point {
     return wantarray ? ($average, $sigma, $repeat) : $average;
 };
 
-sub stat {
+sub get_stat {
     my $self = shift;
     return $self->{stat} || {};
 };
 
-sub default_count {
+sub get_approx {
     my $self = shift;
+    my $data = shift || $self->{stat};
 
-    my $n = $self->{min_arg};
-    my @ret;
-    while ($n <= $self->{max_arg}) {
-        push @ret, $n;
-        $n = int (($n * 3 + 1)/2);
-    };
+    # TODO Add weight based on dispersion
+    my @work = map { [ $_ => $data->{$_}[0] ] } keys %$data;
 
-    return \@ret;
+    my ($A, $B) = _infer_linear(\@work);
+    return Benchmark::Linear::Approx->new( const => $B, linear => $A );
 };
 
-sub linear_approx {
-    my ($self, $pairs) = @_;
+sub _infer_linear {
+    my ($pairs) = @_; # [[x, f(x), weight?], ... ]
 
     my( $n, $x, $y, $x2, $xy);
     foreach (@$pairs) {
@@ -178,15 +178,18 @@ sub linear_approx {
     return ($A, $B);
 };
 
-sub time_per_op {
+
+sub default_count {
     my $self = shift;
-    my $data = shift || $self->{stat};
 
-    # TODO Add weight based on dispersion
-    my @work = map { [ $_ => $data->{$_}[0] ] } keys %$data;
+    my $n = $self->{min_arg};
+    my @ret;
+    while ($n <= $self->{max_arg}) {
+        push @ret, $n;
+        $n = int (($n * 3 + 1)/2);
+    };
 
-    my ($A, $B) = $self->linear_approx( \@work );
-    return $A;
+    return \@ret;
 };
 
 sub _croak {
