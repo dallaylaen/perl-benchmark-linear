@@ -153,31 +153,12 @@ sub get_approx {
     # TODO Add weight based on dispersion
     my @work = map { [ $_ => $data->{$_}[0] ] } keys %$data;
 
-    my ($A, $B) = _infer_linear(\@work);
-    return Benchmark::Linear::Approx->new( const => $B, linear => $A );
+    return $self->approx->infer( \@work );
 };
 
-sub _infer_linear {
-    my ($pairs) = @_; # [[x, f(x), weight?], ... ]
-
-    my( $n, $x, $y, $x2, $xy);
-    foreach (@$pairs) {
-        my $wt = $_->[2] || 1;
-
-        $x  += $wt * $_->[0];
-        $y  += $wt * $_->[1];
-        $x2 += $wt * $_->[0]*$_->[0];
-        $xy += $wt * $_->[0]*$_->[1];
-        $n  += $wt;
-    };
-
-    # y =~ A*x + B; 
-    my $A = ($xy - $x*$y/$n) / ($x2 - $x*$x/$n);
-    my $B = ($y - $A*$x) / $n;
-
-    return ($A, $B);
+sub approx {
+    return 'Benchmark::Linear::Approx';
 };
-
 
 sub default_count {
     my $self = shift;
