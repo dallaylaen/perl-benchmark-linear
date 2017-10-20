@@ -1,8 +1,7 @@
 package Benchmark::Linear;
 
 use 5.010;
-use strict;
-use warnings;
+use Moo;
 our $VERSION = 0.0104;
 
 =head1 NAME
@@ -38,6 +37,19 @@ our @EXPORT_OK = qw(bench);
 
 use Benchmark::Linear::Approx;
 
+my @CLONEABLE = qw( min_arg max_arg max_time repeat init cleanup code );
+
+my $nocode = sub { };
+has init      => is => 'ro', default => sub { $nocode };
+has code      => is => 'ro';
+has cleanup   => is => 'ro', default => sub { $nocode };
+has min_arg   => is => 'ro', default => sub { 1 };
+has max_arg   => is => 'ro', default => sub { 1_000_000 };
+has max_time  => is => 'ro';
+has repeat    => is => 'ro', default => sub { 5 };
+has elapsed   => is => 'ro', default => sub { 0 };
+has stat      => is => 'ro', default => sub { {} }, reader => 'get_stat';
+
 =head2 bench { CODE; } [ option => ... ];
 
 Run a benchmark and return a L<Benchmark::Linear> object
@@ -61,27 +73,10 @@ sub bench(&@) {
     return $bl;
 };
 
-=head2 new
-
-=cut
-
-sub new {
-    my ($class, %opt) = @_;
-
-    $opt{min_arg}  ||= 1;
-    $opt{max_arg}  ||= 1_000_000;
-    $opt{repeat}   ||= 5;
-    $opt{init}     ||= sub {};
-    $opt{cleanup}  ||= sub {};
-
-    return bless \%opt, $class;
-};
-
-my @cloneable = qw( min_arg max_arg repeat init cleanup code );
 sub clone {
     my ($self, %opt) = @_;
 
-    $opt{$_} //= $self->{$_} for @cloneable;
+    $opt{$_} //= $self->$_ for @CLONEABLE;
     return (ref $self)->new( %opt );
 };
 
@@ -98,7 +93,7 @@ sub run {
         if ($opt{code});
 
     $self->_croak("code is required in either new() or run()")
-        unless $self->{code};
+        unless $self->code;
 
     # TODO run auto!
     my $elapsed = 0;
@@ -116,20 +111,20 @@ sub run {
 sub run_point {
     my ($self, $n, $repeat) = @_;
 
-    $repeat ||= $self->{repeat};
+    $repeat ||= $self->repeat;
 
     # run the code
     my ($s, $s2);
-    my $code = $self->{code};
+    my $code = $self->code;
     for my $i ( 1 .. $repeat ) {
         local $_ = $n;
-        my $env = $self->{init}->($n);
+        my $env = $self->init->($n);
         my $t0 = time;
         $code->($n, $env);
         my $t = time - $t0;
         $s  += $t;
         $s2 += $t*$t;
-        $self->{cleanup}->($n, $env);
+        $self->cleanup->($n, $env);
     };
 
     # preprocess stats
@@ -141,14 +136,9 @@ sub run_point {
     return wantarray ? ($average, $sigma, $repeat) : $average;
 };
 
-sub get_stat {
-    my $self = shift;
-    return $self->{stat} || {};
-};
-
 sub get_approx {
     my $self = shift;
-    my $data = shift || $self->{stat};
+    my $data = shift || $self->get_stat;
 
     # TODO Add weight based on dispersion
     my @work = map { [ $_ => $data->{$_}[0] ] } keys %$data;
@@ -163,9 +153,9 @@ sub approx {
 sub default_count {
     my $self = shift;
 
-    my $n = $self->{min_arg};
+    my $n = $self->min_arg;
     my @ret;
-    while ($n <= $self->{max_arg}) {
+    while ($n <= $self->max_arg) {
         push @ret, $n;
         $n = int (($n * 3 + 1)/2);
     };
