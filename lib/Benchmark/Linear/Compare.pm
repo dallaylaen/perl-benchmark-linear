@@ -1,7 +1,7 @@
 package Benchmark::Linear::Compare;
 
 use Moo;
-our $VERSION = 0.0102;
+our $VERSION = 0.0103;
 
 =head1 NAME
 
@@ -36,30 +36,46 @@ All arguments of L<Benchmark::Linear> are accepted, plus
 
 =back
 
-=head2 run
+=head2 run( %options )
 
-No arguments accepted.
 Benchmark ALL functions from the C<todo> hash
 and collect the resulting L<Benchmark::Linear> objects under C<results>.
 
 Self is returned.
 
+%options may include:
+
+=over
+
+=item * count - array of argument values to probe
+
+=back
+
 =cut
 
 sub run {
-    my $self = shift;
+    my ($self, %opt) = @_;
 
     my $todo = $self->todo || shift;
     foreach (keys %$todo) {
         warn __PACKAGE__.": executing $_...\n"
             if $self->verbose;
-        $self->results->{$_} = $self->SUPER::run( code => $todo->{$_} );
+
+        # Actually run smth
+        $self->results->{$_} = $self->SUPER::run(
+            code => $todo->{$_}, count => $opt{count} );
+
         warn __PACKAGE__.": done $_, time=".$self->results->{$_}->elapsed."s\n"
             if $self->verbose;
     };
 
     return $self;
 };
+
+=head2 results
+
+Returns a hash with a L<Benchmark::Linear> object for each tested function.
+The names are the same as given in the todo hash.
 
 =head2 to_string
 

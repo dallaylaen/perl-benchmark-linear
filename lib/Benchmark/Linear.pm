@@ -2,7 +2,7 @@ package Benchmark::Linear;
 
 use 5.010;
 use Moo;
-our $VERSION = 0.0106;
+our $VERSION = 0.0107;
 
 =head1 NAME
 
@@ -50,7 +50,9 @@ Options may include:
 
 =over
 
-=item * min_count, max_count - limits for the parameter;
+=item * count - argument values to run test against.
+
+=item * min_arg, max_arg - limits for the parameter.
 
 =item * max_time - runtime limit. Note that this I<only> affects the
 code being tested, but not support functions.
@@ -61,7 +63,10 @@ measurements. Default is 5, use 1 if you want a really fast benchmark.
 =item * init( $n ) - coderef to be executed before the main routine.
 It's return value will be the CODE's first argument.
 
-=item * cleanup( $env, $n ) - coderef to be executed after the main routine
+=item * cleanup( $env, $n ) - coderef to be executed after the main routine.
+
+=item * inference_class - a class to use to calculate results instead of
+L<BEnchmark::Linear::Approx>.
 
 =back
 
@@ -78,7 +83,7 @@ sub bench(&@) { ## no critic
 
     # TODO filter options
     my $bl = __PACKAGE__->new( %opt );
-    return $bl->run( %opt );
+    return $bl->run( count => $opt{count} );
 };
 
 =head2 bench_all \%common_options, \%code_snippets
@@ -100,7 +105,7 @@ sub bench_all($;$) { ## no critic
     require Benchmark::Linear::Compare;
     my $blc = Benchmark::Linear::Compare->new(
         max_time => 1, %$opt, todo => $fun );
-    $blc->run;
+    $blc->run( count => $opt->{count} );
     return $blc;
 };
 
@@ -243,6 +248,16 @@ sub ops_per_sec {
     my $self = shift;
     return 1 / $self->get_approx->linear;
 };
+
+=head2 get_stat
+
+Returns raw performance measurements as a hashref:
+C<{ n =E<gt> [ seconds, variance, repeat ] }>
+
+=head2 elapsed
+
+Return time spent in the code being tested.
+Note this may differ from the wallclock duration.
 
 =head2 default_count
 
