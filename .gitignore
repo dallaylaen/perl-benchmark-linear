@@ -3,3 +3,7 @@ MANIFEST
 nytprof*
 cover_db
 /Makefile
+MYMETA.*
+META.*
+Makefile.old
+.*.*
