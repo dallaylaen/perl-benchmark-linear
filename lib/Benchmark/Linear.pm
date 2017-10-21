@@ -2,7 +2,7 @@ package Benchmark::Linear;
 
 use 5.010;
 use Moo;
-our $VERSION = 0.0105;
+our $VERSION = 0.0106;
 
 =head1 NAME
 
@@ -78,9 +78,7 @@ sub bench(&@) { ## no critic
 
     # TODO filter options
     my $bl = __PACKAGE__->new( %opt );
-    $bl->run( %opt );
-
-    return $bl;
+    return $bl->run( %opt );
 };
 
 =head2 bench_all \%common_options, \%code_snippets
