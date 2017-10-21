@@ -33,7 +33,7 @@ It is assumed that execution time grows with (n).
 use Time::HiRes qw(time);
 use Carp;
 use Exporter qw(import);
-our @EXPORT_OK = qw(bench);
+our @EXPORT_OK = qw(bench bench_all);
 
 use Benchmark::Linear::Approx;
 
@@ -73,6 +73,17 @@ sub bench(&@) {
     return $bl;
 };
 
+sub bench_all {
+    my $fun = pop;
+    my $opt = shift || {};
+
+    require Benchmark::Linear::Compare;
+    my $blc = Benchmark::Linear::Compare->new(
+        max_time => 1, %$opt, todo => $fun );
+    $blc->run;
+    return $blc;
+};
+
 sub clone {
     my ($self, %opt) = @_;
 
@@ -84,7 +95,10 @@ sub run {
     my ($self, %opt) = @_;
 
     # TODO infer count from min, max
-    $opt{count} ||= $self->default_count;
+    $opt{count}    ||= $self->default_count;
+    $opt{max_time} ||= $self->max_time;
+    $opt{repeat}   ||= $self->repeat;
+
     $self->_croak( "count=[...] is required" )
         unless ref $opt{count} eq 'ARRAY';
 
@@ -144,6 +158,11 @@ sub get_approx {
     my @work = map { [ $_ => $data->{$_}[0] ] } keys %$data;
 
     return $self->approx->infer( \@work );
+};
+
+sub ops_per_sec {
+    my $self = shift;
+    return 1 / $self->get_approx->linear;
 };
 
 sub approx {
