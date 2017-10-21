@@ -1,0 +1,5 @@
+MANIFEST
+*.tar.gz
+nytprof*
+cover_db
+/Makefile
