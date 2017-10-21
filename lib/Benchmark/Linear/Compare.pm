@@ -1,7 +1,20 @@
 package Benchmark::Linear::Compare;
 
 use Moo;
-our $VERSION = 0.0101;
+our $VERSION = 0.0102;
+
+=head1 NAME
+
+Benchmark::Linear::Compare - Parametric Big-O(n) performance measurement.
+
+=head1 DESCRIPTION
+
+This module is part of L<Benchmark::Linear> suite.
+See C<bench_all> function.
+
+=head1 METHODS
+
+=cut
 
 extends 'Benchmark::Linear';
 
@@ -10,6 +23,28 @@ use overload '""' => \&to_string;
 has todo    => is => 'ro', default => sub { {} };
 has results => is => 'ro', default => sub { {} };
 has verbose => is => 'ro';
+
+=head2 new
+
+All arguments of L<Benchmark::Linear> are accepted, plus
+
+=over
+
+=item * todo { name => \&sub, ... } - code snippets to be compared.
+
+=item * verbose - provide some warns during execution.
+
+=back
+
+=head2 run
+
+No arguments accepted.
+Benchmark ALL functions from the C<todo> hash
+and collect the resulting L<Benchmark::Linear> objects under C<results>.
+
+Self is returned.
+
+=cut
 
 sub run {
     my $self = shift;
@@ -25,6 +60,14 @@ sub run {
 
     return $self;
 };
+
+=head2 to_string
+
+Format a comparison table similar to that of L<Benchmark>.
+
+
+
+=cut
 
 sub to_string {
     my $self = shift;
@@ -68,7 +111,7 @@ sub _cross_table {
     my @raw = map { [ $_ => $in{$_} ] }
         sort { $in{$a} <=> $in{$b} } keys %in;
 
-    foreach my $line ( @raw ) { 
+    foreach my $line ( @raw ) {
         push @$line, map { _percent_diff($_->[1], $line->[1]) } @raw;
     };
     $_->[1] > 100 and $_->[1] = sprintf "%0.0f", $_->[1]
