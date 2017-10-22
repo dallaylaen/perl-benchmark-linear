@@ -2,7 +2,7 @@ package Benchmark::Linear;
 
 use 5.010;
 use Moo;
-our $VERSION = 0.0107;
+our $VERSION = 0.0108;
 
 =head1 NAME
 
@@ -201,7 +201,7 @@ sub _run_point {
         local $_ = $n;
         my $env = $self->init->($n);
         my $t0 = time;
-        $code->($n, $env);
+        $code->($env, $n);
         my $t = time - $t0;
         $s  += $t;
         $s2 += $t*$t;

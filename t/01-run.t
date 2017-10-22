@@ -7,7 +7,7 @@ use Test::More;
 use Benchmark::Linear;
 
 my %trace;
-my $bl = Benchmark::Linear->new( code => sub {$trace{ shift() } ++} );
+my $bl = Benchmark::Linear->new( code => sub {$trace{ $_ } ++} );
 
 my $todo = [ map { 2 ** $_ } 1 .. 10 ];
 
